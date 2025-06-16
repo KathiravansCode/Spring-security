@@ -9,6 +9,7 @@ import org.springframework.security.core.userdetails.UserDetails;
 
 import com.fasterxml.jackson.annotation.JsonIgnore;
 
+import java.time.LocalDate;
 import java.util.Collection;
 import java.util.List;
 import java.util.Objects;
@@ -26,21 +27,39 @@ public class UserDetailsImpl implements UserDetails {
     private String password;
 
     private boolean is2faEnabled;
+    private boolean accountNonExpired;
+    private boolean accountNonLocked;
+    private boolean credentialsNonExpired;
+    private boolean enabled;
 
     private Collection<? extends GrantedAuthority> authorities;
 
     public UserDetailsImpl(Long id, String username, String email, String password,
-                           boolean is2faEnabled, Collection<? extends GrantedAuthority> authorities) {
+                           boolean is2faEnabled, boolean accountNonExpired, boolean accountNonLocked,
+                           boolean credentialsNonExpired, boolean enabled,
+                           Collection<? extends GrantedAuthority> authorities) {
         this.id = id;
         this.username = username;
         this.email = email;
         this.password = password;
         this.is2faEnabled = is2faEnabled;
+        this.accountNonExpired = accountNonExpired;
+        this.accountNonLocked = accountNonLocked;
+        this.credentialsNonExpired = credentialsNonExpired;
+        this.enabled = enabled;
         this.authorities = authorities;
     }
 
     public static UserDetailsImpl build(User user) {
         GrantedAuthority authority = new SimpleGrantedAuthority(user.getRole().getRoleName().name());
+
+        // Check if account is expired
+        boolean accountNonExpired = user.getAccountExpiryDate() == null ||
+                user.getAccountExpiryDate().isAfter(LocalDate.now());
+
+        // Check if credentials are expired
+        boolean credentialsNonExpired = user.getCredentialsExpiryDate() == null ||
+                user.getCredentialsExpiryDate().isAfter(LocalDate.now());
 
         return new UserDetailsImpl(
                 user.getUserId(),
@@ -48,10 +67,13 @@ public class UserDetailsImpl implements UserDetails {
                 user.getEmail(),
                 user.getPassword(),
                 user.isTwoFactorEnabled(),
-                List.of(authority) // Wrapping the single authority in a list
+                accountNonExpired,
+                user.isAccountNonLocked(),
+                credentialsNonExpired,
+                user.isEnabled(),
+                List.of(authority)
         );
     }
-
 
     @Override
     public Collection<? extends GrantedAuthority> getAuthorities() {
@@ -78,22 +100,22 @@ public class UserDetailsImpl implements UserDetails {
 
     @Override
     public boolean isAccountNonExpired() {
-        return true;
+        return accountNonExpired;
     }
 
     @Override
     public boolean isAccountNonLocked() {
-        return true;
+        return accountNonLocked;
     }
 
     @Override
     public boolean isCredentialsNonExpired() {
-        return true;
+        return credentialsNonExpired;
     }
 
     @Override
     public boolean isEnabled() {
-        return true;
+        return enabled;
     }
 
     public boolean is2faEnabled() {
